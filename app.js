@@ -22,6 +22,34 @@ function adventDoorAvailable(day,now=new Date()){
   return Number.isInteger(day)&&day>=1&&day<=24&&adventDateKey(now)>=20261200+day;
 }
 
+
+function adventWaitText(day,now=new Date()){
+  // All December 2026 unlocks occur at midnight CET (UTC+01:00).
+  const remaining=Date.parse('2026-12-'+String(day).padStart(2,'0')+'T00:00:00+01:00')-now.getTime();
+  if(remaining<=0)return null;
+  let duration;
+  if(remaining<60000)duration='weniger als einer Minute';
+  else if(remaining<3600000){
+    const minutes=Math.ceil(remaining/60000);
+    duration=minutes+' '+(minutes===1?'Minute':'Minuten');
+  }else{
+    const totalHours=Math.ceil(remaining/3600000);
+    const days=Math.floor(totalHours/24),hours=totalHours%24;
+    const parts=[];
+    if(days)parts.push(days+' '+(days===1?'Tag':'Tagen'));
+    if(hours)parts.push(hours+' '+(hours===1?'Stunde':'Stunden'));
+    duration=parts.join(' und ');
+  }
+  return 'Türchen erst aufmachbar in '+duration+'.';
+}
+let adventWaitingDay=null;
+function refreshAdventWait(){
+  if(adventWaitingDay===null)return;
+  const text=adventWaitText(adventWaitingDay);
+  $('#advent-status').textContent=text||'Türchen '+adventWaitingDay+' kann jetzt geöffnet werden.';
+  if(!text)adventWaitingDay=null;
+}
+
 const adventOpened=new Set();
 const adventDialog=$('#advent-dialog');
 $('#advent-doors').innerHTML=Array.from({length:24},(_,i)=>'<button type="button" class="advent-door" data-day="'+(i+1)+'"><strong>'+(i+1)+'</strong><span></span></button>').join('');
@@ -33,8 +61,10 @@ function refreshAdventDoors(){
     button.classList.toggle('is-open',opened);
     button.querySelector('span').textContent=available?(opened?'Geöffnet':'Öffnen'):'Ab '+day+'.12.';
   });
+  refreshAdventWait();
 }
 function showAdventCalendar(){
+  adventWaitingDay=null;
   refreshAdventDoors();
   $('#advent-status').textContent='Wähle ein Türchen.';
   if(!adventDialog.open)adventDialog.showModal();
@@ -47,9 +77,11 @@ $('#advent-doors').addEventListener('click',event=>{
   const button=event.target.closest('.advent-door');
   if(!button)return;
   const day=Number(button.dataset.day);
+  adventWaitingDay=null;
   refreshAdventDoors();
   if(!adventDoorAvailable(day)){
-    $('#advent-status').textContent='Dieses Türchen kannst du ab dem '+day+'. Dezember 2026 öffnen.';
+    adventWaitingDay=day;
+    refreshAdventWait();
     return;
   }
   adventOpened.add(day);
