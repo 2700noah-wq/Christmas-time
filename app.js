@@ -12,3 +12,51 @@ $('.calendar-grid').innerHTML=Array.from({length:24},(_,i)=>`<span>${i+1}</span>
 function openGift(i){if(opening)return;opening=true;const gift=$('#gift'+(i+1));const firstOpen=!gift.classList.contains('opened');gift.classList.add('opened');gift.setAttribute('aria-label',i?'Geschenk für Kai erneut ansehen':'Geschenk für dich erneut ansehen');setTimeout(()=>{stage=Math.max(stage,i+1);$('#salutation').textContent=texts[i].title;$('#message').innerHTML=texts[i].paras.map(p=>`<p>${p}</p>`).join('');$('#globe').hidden=i===1;$('#calendar').hidden=i===0;$('#gift-caption').textContent=i?'24 KLEINE FREUDEN':'EIN WEIHNACHTEN MIT DIR';$('#paper-kicker').textContent=i?'FÜR KAI · VON HERZEN':'25. DEZEMBER 2026';clearTimeout(backTimer);$('#back').hidden=firstOpen;$('#wait-note').hidden=!firstOpen;$('#letter').showModal();$('#letter').scrollTop=0;if(firstOpen)backTimer=setTimeout(()=>{$('#back').hidden=false;$('#wait-note').hidden=true},6000);opening=false},850)}
 function closeLetter(){clearTimeout(backTimer);$('#letter').close();if(stage>=1){$('#gift2').disabled=false;$('#gift2 .tag').hidden=false;$('#gift2').setAttribute('aria-label','Geschenk für Kai öffnen');$('#hint').textContent=stage===2?'Zwei kleine Geschenke. Und ganz viel Liebe.':'Da ist noch etwas. Dieses Geschenk ist für Kai.'}}
 $('#gift1').onclick=()=>openGift(0);$('#gift2').onclick=()=>openGift(1);$('#back').onclick=closeLetter;$('#letter').addEventListener('cancel',e=>{e.preventDefault();closeLetter()});
+
+const adventDateFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Vienna',year:'numeric',month:'2-digit',day:'2-digit'});
+function adventDateKey(now=new Date()){
+  const parts=Object.fromEntries(adventDateFormat.formatToParts(now).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
+  return Number(parts.year)*10000+Number(parts.month)*100+Number(parts.day);
+}
+function adventDoorAvailable(day,now=new Date()){
+  return Number.isInteger(day)&&day>=1&&day<=24&&adventDateKey(now)>=20261200+day;
+}
+
+const adventOpened=new Set();
+const adventDialog=$('#advent-dialog');
+$('#advent-doors').innerHTML=Array.from({length:24},(_,i)=>'<button type="button" class="advent-door" data-day="'+(i+1)+'"><strong>'+(i+1)+'</strong><span></span></button>').join('');
+function refreshAdventDoors(){
+  document.querySelectorAll('.advent-door').forEach(button=>{
+    const day=Number(button.dataset.day),available=adventDoorAvailable(day),opened=available&&adventOpened.has(day);
+    button.setAttribute('aria-disabled',String(!available));
+    button.setAttribute('aria-label',day+'. Dezember 2026, '+(available?(opened?'geöffnet':'Türchen öffnen'):'noch gesperrt'));
+    button.classList.toggle('is-open',opened);
+    button.querySelector('span').textContent=available?(opened?'Geöffnet':'Öffnen'):'Ab '+day+'.12.';
+  });
+}
+function showAdventCalendar(){
+  refreshAdventDoors();
+  $('#advent-status').textContent='Wähle ein Türchen.';
+  if(!adventDialog.open)adventDialog.showModal();
+}
+$('#advent-launch').onclick=showAdventCalendar;
+const wallCalendar=$('#wall-advent-calendar');
+wallCalendar.style.cursor='pointer';
+wallCalendar.addEventListener('click',showAdventCalendar);
+$('#advent-doors').addEventListener('click',event=>{
+  const button=event.target.closest('.advent-door');
+  if(!button)return;
+  const day=Number(button.dataset.day);
+  refreshAdventDoors();
+  if(!adventDoorAvailable(day)){
+    $('#advent-status').textContent='Dieses Türchen kannst du ab dem '+day+'. Dezember 2026 öffnen.';
+    return;
+  }
+  adventOpened.add(day);
+  refreshAdventDoors();
+  $('#advent-status').textContent='Türchen '+day+' ist geöffnet. Hier ist noch kein Inhalt hinterlegt.';
+});
+$('#advent-close').onclick=()=>adventDialog.close();
+setInterval(()=>{if(adventDialog.open)refreshAdventDoors();},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAdventDoors();});
+refreshAdventDoors();
